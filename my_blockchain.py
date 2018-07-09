@@ -44,7 +44,7 @@ class Blockchain:
 
     @staticmethod
     def hash(block):
-        block_string = json.dump(block, sort_keys=True)
+        block_string = json.dumps(block, sort_keys=True)
         return hashlib.sha256(block_string.encode()).hexdigest()
 
     def proof_of_work(self, last_block):
@@ -56,7 +56,7 @@ class Blockchain:
     @staticmethod
     def valid_proof(last_block, nonce):
         nonce_joined = hash(last_block) + nonce
-        calced = hashlib.sha256(nonce_joined.encode()).hexdigest()
+        calced = hashlib.sha256(str(nonce_joined).encode()).hexdigest()
         return calced[:4] == "0000"
 
     def valid_chain(self, chain):
@@ -109,9 +109,37 @@ class Blockchain:
 
 app = Flask(__name__)
 
-node_identifire = str(uuid4()).replace('-', '')
+node_identifier = str(uuid4()).replace('-', '')
 
 blockchain = Blockchain()
+
+
+@app.route('/mine', methods=['GET'])
+def mine():
+    # We run the proof of work algorithm to get the next proof...
+    last_block = blockchain.last_block
+    nonce = blockchain.proof_of_work(last_block)
+
+    # nonceを見つけた報酬をもらう
+    # このノードが新しいコインをマイニングしたこと示すために送信者は0とする
+    blockchain.create_new_transaction(
+        sender="0",
+        recipient=node_identifier,
+        amount=1,
+    )
+
+    # ブロックをチェーンに加えて新しいブロックを採掘する
+    previous_hash = blockchain.hash(last_block)
+    block = blockchain.create_new_block(nonce, previous_hash)
+
+    response = {
+        'message': "New Block Forged",
+        'index': block['index'],
+        'transactions': block['transactions'],
+        'proof': block['proof'],
+        'previous_hash': block['previous_hash'],
+    }
+    return jsonify(response), 200
 
 
 # メソッドはPOSTで/transactions/newエンドポイントを作る。メソッドはPOSTなのでデータを送信する
